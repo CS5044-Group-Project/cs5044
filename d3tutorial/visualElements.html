@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<script src="https://d3js.org/d3.v7.min.js"></script>
+		<link rel="stylesheet" href="//apps.bdimg.com/libs/jqueryui/1.10.4/css/jquery-ui.min.css">
+		<script src="//apps.bdimg.com/libs/jquery/1.10.2/jquery.min.js"></script>
+		<script src="//apps.bdimg.com/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+		<link rel="stylesheet" type="text/css" href="CSS.css">
+		<title> D3 Tutorial </title>
+	</head>
+
+	<body>
+		<h2>D3 Visual Elements</h2>
+		<div class="container">
+			<div class="topbar">Topbar content</div>
+			<div class="sidebar">Sidebar
+				<p>
+					<label for="amount" style="font-size: 10px">Age range for chart1</label>
+					<input type="text" id="ageRange" style="border:0; color:#f6931f; font-weight:bold;font-size: 12px">
+				</p>
+				<div id="slider-range" style="height:0.7em"></div>
+				
+			</div>
+			<div class="content">
+				<svg id="chart1" width="420" height="240" style="border: 1px solid rgb(144, 150, 149);"></svg>
+				<svg id="chart2"></svg>
+				<svg id="chart3"></svg>
+				<svg id="chart4"></svg>
+			</div>
+		</div>
+		
+		<script>
+
+			var ageMin = 18, ageMax = 64, dataPath = "data/dummy_data.csv",
+				color = d3.scaleOrdinal().domain(["YouTube", "Facebook", "Instagram"]).range(["#FF6347", "#FFD700", "#87CEEB"]),
+				legendData = [{"platform": "YouTube", "color": "#FF6347"}, 
+								{"platform": "Facebook", "color": "#FFD700"}, 
+								{"platform": "Instagram", "color": "#87CEEB"}],
+				filteredData, timeAvgPlatform, locationPlatformData, svg, margin, g, locationGroup,
+				svgWidth, svgHeight, width, height, x0, x1, maxAvgTime, y, rootData;
+
+			$(function() { // **Reference** Cite slider from https://www.runoob.com/jqueryui/example-slider.html
+				$( "#slider-range" ).slider({
+				range: true,
+				min: 18,
+				max: 64,
+				values: [18, 64],
+				slide: function( event, ui ) {
+					$( "#ageRange" ).val("Min:" + ui.values[ 0 ] + " - Max:" + ui.values[ 1 ] );
+					ageMin = ui.values[ 0 ], ageMax = ui.values[ 1 ];
+					updateChart1(ageMin, ageMax); // update Chart1
+				}
+				});
+				$( "#ageRange" ).val("Min:" + $( "#slider-range" ).slider( "values", 0 )  +
+				" - Max:" + $( "#slider-range" ).slider( "values", 1 ) );
+			});
+
+			function updateChart1(ageMin, ageMax){ // update chart1 by given new age range and re-execute drawChart1()
+				d3.select("#chart1").selectAll(".bar").remove(); // remove the Chart1
+    			d3.select("#chart1").selectAll(".axis").remove();
+	 			d3.select("#chart1").selectAll(".legend").remove();
+				
+				drawChart1(rootData); // re-painting chart1
+			};
+
+			function drawChart1(rootData){ // draw Chart1 using global variables defined at the first part of the script
+
+				filteredData = rootData.filter(function(d) {
+    				return d.age >= ageMin && d.age <= ageMax;
+				});
+				
+				timeAvgPlatform = d3.rollup(filteredData, v => +d3.mean(v, d => d.time_spent).toFixed(2), d => d.location, d => d.platform);
+				locationPlatformData = Array.from(timeAvgPlatform, ([location, platforms]) =>
+					 ({location, platforms: Array.from(platforms, ([platform, avgTime]) => ({platform, avgTime}) )}) );
+				
+				svg = d3.select("#chart1");
+				margin = {top: 30, right: 10, bottom: 30, left: 25};
+
+				svgWidth = +svg.attr("width");
+				svgHeight = +svg.attr("height");
+				width = svgWidth - margin.left - margin.right;
+				height = svgHeight - margin.top - margin.bottom;
+
+				g = svg.append("g").attr("transform", "translate(" + 20 + "," + 40 + ")");
+
+				x0 = d3.scaleBand().rangeRound([0, width]).padding(0.30).domain(locationPlatformData.map(d => d.location));
+				x1 = d3.scaleBand().padding(0.05).domain(["YouTube", "Facebook", "Instagram"]).rangeRound([0, x0.bandwidth()]);
+				maxAvgTime = d3.max(locationPlatformData, function(location){
+					return d3.max(location.platforms, function(d) {
+						return d.avgTime;
+					});
+				});
+				y = d3.scaleLinear().range([height, 0]).domain([0, maxAvgTime]);
+
+				locationGroup = g.selectAll(".location-group").data(locationPlatformData).enter().append("g")
+									   .attr("class", "location-group").attr("transform", d => `translate(${x0(d.location)}, 0)`);
+				
+				locationGroup.selectAll(".bar")
+                	.data(d => d.platforms)
+                	.enter().append("rect")
+                    .attr("class", "bar")
+                    .attr("x", d => x1(d.platform))
+                    .attr("y", d => y(d.avgTime))
+                    .attr("width", x1.bandwidth())
+                    .attr("height", d => height - y(d.avgTime))
+					.attr("fill", d => color(d.platform));
+				
+				g.append("g")
+					.attr("class", "axis")
+					.attr("transform", `translate(0, ${height})`)
+					.call(d3.axisBottom(x0));
+
+				g.append("g")
+					.attr("class", "axis")
+					.attr("transform", "translate(" + margin.left + ",0)")
+					.call(d3.axisLeft(y))
+					.append("text")
+					.attr("transform", "rotate(-90)")
+					.attr("y", 6) 
+					.attr("dy", "-1em") 
+					.attr("x", 0 - (height / 2)) 
+					.style("text-anchor", "middle") 
+					.text("Average Time Spent (Hours)"); 
+
+				svg.append("text")
+					.attr("x", svgWidth / 2)
+					.attr("y", margin.top / 2)
+					.attr("text-anchor", "middle")
+					.style("font-size", "12.5px")
+					.text("Average time spent using three different Apps");
+
+				var legend = svg.selectAll(".legend")
+					.data(legendData)
+					.enter().append("g")
+					.attr("class", "legend")
+					.attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+
+				legend.append("rect")
+					.attr("x", svgWidth - 15)
+					.attr("width", 12)
+					.attr("height", 12)
+					.style("fill", function(d) { return d.color; });
+
+				legend.append("text")
+					.attr("x", svgWidth - 20)
+					.attr("y", 9)
+					.attr("dy", ".05em")
+					.style("text-anchor", "end")
+					.style("font-size", "10px")
+					.text(function(d) { return d.platform; });
+			};
+
+
+			d3.csv(dataPath) // initialise Chart1
+				.then(function(myData){
+				rootData = myData;
+				drawChart1(rootData);
+					
+			});
+			
+		</script>
+		
+	</body>
+
+</html>

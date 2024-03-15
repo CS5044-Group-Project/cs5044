@@ -1,0 +1,38 @@
+.container {
+    display: grid;
+    grid-template-columns: 100px auto; /* 侧边栏宽度和内容区域宽度 */
+    grid-template-rows: 50px auto; /* 顶部栏高度和内容区域高度 */
+    gap: 20px; /* 网格间隙 */
+    height: 100vh; /* 视口高度 */
+  }
+  
+  .sidebar {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+  }
+  
+  .topbar {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  
+  .content {
+    grid-column: 2;
+    grid-row: 2;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  
+  .svg-container {
+    width: 100%;
+    aspect-ratio: 2 / 1;
+  }
+  
+  .bar-text {
+    font-size: 10px; /* 调整字体大小 */
+    fill: #000; /* 字体颜色 */
+    /* 其他可能的样式，如字体类型等 */
+  }
+  
+  
