@@ -10,6 +10,22 @@
     grid-column: 1;
     grid-row: 1 / span 2;
   }
+
+  .ui-slider-handle {
+    border-radius: 50%;    /* Makes the handle round */
+    width: 1em;            /* Size of the handle */
+    height: 1em;           /* Size of the handle */
+    top: 0.3em;            /* Adjust vertical position to center */
+    background: white;     /* Background color of the handle */
+    border: 1px solid #ccc; /* Border color */
+}
+
+.ui-slider-handle:active,
+.ui-slider-handle:focus {
+    outline: none;    /* Removes the outline */
+    box-shadow: none; /* Removes the shadow */
+}
+
   
   .topbar {
     grid-column: 2;
@@ -33,6 +49,11 @@
     font-size: 10px; /* 调整字体大小 */
     fill: #000; /* 字体颜色 */
     /* 其他可能的样式，如字体类型等 */
+  }
+  
+  .country {
+    fill:#d4d2d2;
+    stroke: #999;
   }
   
   
