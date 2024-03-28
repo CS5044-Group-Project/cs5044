@@ -6,6 +6,7 @@
 		<link rel="stylesheet" href="//apps.bdimg.com/libs/jqueryui/1.10.4/css/jquery-ui.min.css">
 		<script src="//apps.bdimg.com/libs/jquery/1.10.2/jquery.min.js"></script>
 		<script src="//apps.bdimg.com/libs/jqueryui/1.10.4/jquery-ui.min.js"></script>
+		<script src="https://d3js.org/topojson.v1.min.js"></script>
 		<link rel="stylesheet" type="text/css" href="CSS.css">
 		<title> D3 Tutorial </title>
 	</head>
@@ -16,66 +17,154 @@
 			<div class="topbar">Topbar content</div>
 			<div class="sidebar">Sidebar
 				<p>
-					<label for="amount" style="font-size: 10px">Age range for chart1</label>
-					<input type="text" id="ageRange" style="border:0; color:#f6931f; font-weight:bold;font-size: 12px">
+					<label for="amount" style="font-size: 12px">Amount Filter</label>
+					<input type="text" id="amountRange" style="border:0; color:black;font-size: 12px">
 				</p>
-				<div id="slider-range" style="height:0.7em"></div>
+				<div id="amount-range" style="height:0.7em"></div>
+
+				<p>
+					<label for="month" style="font-size: 12px">Month Filter</label>
+					<input type="text" id="monthRange" style="border:0; color:black;font-size: 12px">
+				</p>
+				<div id="month-range" style="height:0.7em"></div>
+
+				<p>
+					<label style="font-size: 12px">Risk Level Filter:</label><br>
+					<input type="checkbox" id="lowRisk" name="riskLevel" value="low_risk">
+					<label for="lowRisk" style="font-size: 10px">Low Risk</label><br>
+					<input type="checkbox" id="moderateRisk" name="riskLevel" value="moderate_risk">
+					<label for="moderateRisk" style="font-size: 10px">Moderate Risk</label><br>
+					<input type="checkbox" id="highRisk" name="riskLevel" value="high_risk">
+					<label for="highRisk" style="font-size: 10px">High Risk</label>
+				</p>
 				
 			</div>
 			<div class="content">
-				<svg id="chart1" width="420" height="240" style="border: 1px solid rgb(144, 150, 149);"></svg>
-				<svg id="chart2"></svg>
+				<svg id="chart1" width="450" height="240" style="border: 1px solid rgb(144, 150, 149);"></svg>
+				<svg id="chart2" width="450" height="240" style="border: 1px solid rgb(144, 150, 149);"></svg>
 				<svg id="chart3"></svg>
 				<svg id="chart4"></svg>
 			</div>
 		</div>
+
 		
 		<script>
-
-			var ageMin = 18, ageMax = 64, dataPath = "data/dummy_data.csv",
-				color = d3.scaleOrdinal().domain(["YouTube", "Facebook", "Instagram"]).range(["#FF6347", "#FFD700", "#87CEEB"]),
-				legendData = [{"platform": "YouTube", "color": "#FF6347"}, 
-								{"platform": "Facebook", "color": "#FFD700"}, 
-								{"platform": "Instagram", "color": "#87CEEB"}],
-				filteredData, timeAvgPlatform, locationPlatformData, svg, margin, g, locationGroup,
-				svgWidth, svgHeight, width, height, x0, x1, maxAvgTime, y, rootData;
+			// **Chart 1**
+			var amountMin = 15, amountMax = 100, dataPath = "data/metaverse_transactions_dataset.csv",
+				color = d3.scaleOrdinal().domain(["phishing", "purchase", "sale", "scam", "transfer"]).range(["#1E90FF", "#32CD32", "#FF6347", "#9370DB", "#FFD700"]),
+				legendData = [{"transaction": "phishing", "color": "#1E90FF"}, 
+								{"transaction": "purchase", "color": "#32CD32"}, 
+								{"transaction": "sale", "color": "#FF6347"},
+								{"transaction": "scam", "color": "#9370DB"},
+								{"transaction": "transfer", "color": "#FFD700"}],
+				filteredData, scoreAvgTransaction, regionTransactionData, svg, margin, g, regionGroup,
+				svgWidth, svgHeight, width, height, x0, x1, maxAvgScore, y, rootData;
+			// **Chart 2**
+			var worldJSON = "data/world.json", monthMin=1, monthMax=12, selectedRisks=['low_rish', 'moderate_risk', 'high_risk'],
+				svg_map;
+			
 
 			$(function() { // **Reference** Cite slider from https://www.runoob.com/jqueryui/example-slider.html
-				$( "#slider-range" ).slider({
+				$( "#amount-range" ).slider({
 				range: true,
-				min: 18,
-				max: 64,
-				values: [18, 64],
+				min: 15,
+				max: 100,
+				values: [15, 100],
 				slide: function( event, ui ) {
-					$( "#ageRange" ).val("Min:" + ui.values[ 0 ] + " - Max:" + ui.values[ 1 ] );
-					ageMin = ui.values[ 0 ], ageMax = ui.values[ 1 ];
-					updateChart1(ageMin, ageMax); // update Chart1
+					$( "#amountRange" ).val("min:" + ui.values[ 0 ] + " - max:" + ui.values[ 1 ] );
+					amountMin = ui.values[ 0 ], amountMax = ui.values[ 1 ];
+					updateChart1(amountMin, amountMax); // update Chart1
 				}
 				});
-				$( "#ageRange" ).val("Min:" + $( "#slider-range" ).slider( "values", 0 )  +
-				" - Max:" + $( "#slider-range" ).slider( "values", 1 ) );
+				$( "#amountRange" ).val("min:" + $( "#amount-range" ).slider( "values", 0 )  +
+				" - max:" + $( "#amount-range" ).slider( "values", 1 ) );
+
+				$( "#month-range" ).slider({
+				range: false,
+				min: 1,
+				max: 12,
+				value: 1,
+				slide: function( event, ui ) {
+					$( "#monthRange" ).val("current month:" + ui.value);
+					monthMin = ui.value, monthMax = ui.value + 1;
+					updateChart2(); // update Chart2
+				}
+				});
+				$( "#monthRange" ).val("current month:" + $( "#month-range" ).slider("value"));
+
+				$("input[name='riskLevel']").on('change', function() {
+					selectedRisks = $("input[name='riskLevel']:checked")
+											.map(function() { return this.value; })
+											.get(); // 获取所有选中的风险级别
+					updateChart2();
+				});
 			});
 
-			function updateChart1(ageMin, ageMax){ // update chart1 by given new age range and re-execute drawChart1()
-				d3.select("#chart1").selectAll(".bar").remove(); // remove the Chart1
-    			d3.select("#chart1").selectAll(".axis").remove();
-	 			d3.select("#chart1").selectAll(".legend").remove();
+
+			function updateChart1(scoreMin, scoreMax){ // update chart1 by given new age range and re-execute drawChart1()
+				d3.select("#chart1").selectAll("*").remove();
 				
 				drawChart1(rootData); // re-painting chart1
 			};
 
+			function updateChart2(){ // update chart1 by given new age range and re-execute drawChart1()
+				d3.select("#chart2").selectAll("*").remove();
+				console.log(monthMin);
+				console.log(selectedRisks);
+				drawChart2(rootData); // re-painting chart1
+			};
+
+			function convertRegionToCountry(region) {
+				switch (region) {
+					case "South America":
+						return "Brazil"; 
+					case "North America":
+						return "United States of America";
+					case "Africa":
+						return "Nigeria";
+					case "Europe":
+						return "Germany";
+					case "Asia":
+						return "China";
+					default:
+						return region;
+				}
+			};
+
+			function getCentroid(region, geojsonData, path) {
+				const country = convertRegionToCountry(region);
+
+				// 从GeoJSON数据中找到与指定地区名称匹配的feature
+				var matchingFeature = geojsonData.features.find(function(feature) {
+					// 这里我们假设每个feature都有一个名为properties的对象，该对象有一个名为NAME的属性
+					// 你需要根据实际情况调整这个条件，以匹配你的GeoJSON数据结构
+					return feature.properties.name === country;
+				});
+
+				// 如果找到了匹配的feature，则使用D3的path.centroid()函数来计算中心点
+				if (matchingFeature) {
+					return path.centroid(matchingFeature);
+				} else {
+					console.log("country match failed")
+					// 如果没有找到匹配的feature，则返回一个默认的位置，或者你可以处理这种情况
+					return [50, 50]; // 默认值，你可能需要调整
+				}
+			};
+
 			function drawChart1(rootData){ // draw Chart1 using global variables defined at the first part of the script
 
-				filteredData = rootData.filter(function(d) {
-    				return d.age >= ageMin && d.age <= ageMax;
+				filteredData_bar = rootData.filter(function(d) {
+    				return d.amount >= amountMin && d.amount <= amountMax;
 				});
 				
-				timeAvgPlatform = d3.rollup(filteredData, v => +d3.mean(v, d => d.time_spent).toFixed(2), d => d.location, d => d.platform);
-				locationPlatformData = Array.from(timeAvgPlatform, ([location, platforms]) =>
-					 ({location, platforms: Array.from(platforms, ([platform, avgTime]) => ({platform, avgTime}) )}) );
+				scoreAvgTransaction = d3.rollup(filteredData_bar, v => +d3.mean(v, d => d.risk_score).toFixed(2), d => d.location_region, d => d.transaction_type);
+				regionTransactionData = Array.from(scoreAvgTransaction, ([region, transactions]) =>
+					 ({region, transactions: Array.from(transactions, ([transaction, avgScore]) => ({transaction, avgScore}) )}) );
+
+				// console.log(regionTransactionData);
 				
 				svg = d3.select("#chart1");
-				margin = {top: 30, right: 10, bottom: 30, left: 25};
+				margin = {top: 30, right:25, bottom: 30, left: 5};
 
 				svgWidth = +svg.attr("width");
 				svgHeight = +svg.attr("height");
@@ -84,27 +173,27 @@
 
 				g = svg.append("g").attr("transform", "translate(" + 20 + "," + 40 + ")");
 
-				x0 = d3.scaleBand().rangeRound([0, width]).padding(0.30).domain(locationPlatformData.map(d => d.location));
-				x1 = d3.scaleBand().padding(0.05).domain(["YouTube", "Facebook", "Instagram"]).rangeRound([0, x0.bandwidth()]);
-				maxAvgTime = d3.max(locationPlatformData, function(location){
-					return d3.max(location.platforms, function(d) {
-						return d.avgTime;
+				x0 = d3.scaleBand().rangeRound([0, width-20]).padding(0.30).domain(regionTransactionData.map(d => d.region));
+				x1 = d3.scaleBand().padding(0.05).domain(["phishing", "purchase", "sale", "scam", "transfer"]).rangeRound([0, x0.bandwidth()]);
+				maxAvgScore = d3.max(regionTransactionData, function(region){
+					return d3.max(region.transactions, function(d) {
+						return d.avgScore;
 					});
 				});
-				y = d3.scaleLinear().range([height, 0]).domain([0, maxAvgTime]);
+				y = d3.scaleLinear().range([height, 0]).domain([0, maxAvgScore]);
 
-				locationGroup = g.selectAll(".location-group").data(locationPlatformData).enter().append("g")
-									   .attr("class", "location-group").attr("transform", d => `translate(${x0(d.location)}, 0)`);
+				regionGroup = g.selectAll(".region-group").data(regionTransactionData).enter().append("g")
+									   .attr("class", "region-group").attr("transform", d => `translate(${x0(d.region)}, 0)`);
 				
-				locationGroup.selectAll(".bar")
-                	.data(d => d.platforms)
+				regionGroup.selectAll(".bar")
+                	.data(d => d.transactions)
                 	.enter().append("rect")
                     .attr("class", "bar")
-                    .attr("x", d => x1(d.platform))
-                    .attr("y", d => y(d.avgTime))
+                    .attr("x", d => x1(d.transaction))
+                    .attr("y", d => y(d.avgScore))
                     .attr("width", x1.bandwidth())
-                    .attr("height", d => height - y(d.avgTime))
-					.attr("fill", d => color(d.platform));
+                    .attr("height", d => height - y(d.avgScore))
+					.attr("fill", d => color(d.transaction));
 				
 				g.append("g")
 					.attr("class", "axis")
@@ -121,20 +210,20 @@
 					.attr("dy", "-1em") 
 					.attr("x", 0 - (height / 2)) 
 					.style("text-anchor", "middle") 
-					.text("Average Time Spent (Hours)"); 
+					.text("Average risk score"); 
 
 				svg.append("text")
 					.attr("x", svgWidth / 2)
 					.attr("y", margin.top / 2)
 					.attr("text-anchor", "middle")
 					.style("font-size", "12.5px")
-					.text("Average time spent using three different Apps");
+					.text("Average risk score of transaction type");
 
 				var legend = svg.selectAll(".legend")
 					.data(legendData)
 					.enter().append("g")
 					.attr("class", "legend")
-					.attr("transform", function(d, i) { return "translate(0," + i * 20 + ")"; });
+					.attr("transform", function(d, i) { return "translate(0," + i * 15 + ")"; });
 
 				legend.append("rect")
 					.attr("x", svgWidth - 15)
@@ -143,20 +232,149 @@
 					.style("fill", function(d) { return d.color; });
 
 				legend.append("text")
-					.attr("x", svgWidth - 20)
-					.attr("y", 9)
+					.attr("x", svgWidth-20)
+					.attr("y", 10)
 					.attr("dy", ".05em")
 					.style("text-anchor", "end")
 					.style("font-size", "10px")
-					.text(function(d) { return d.platform; });
+					.text(function(d) { return d.transaction; });
 			};
+
+			function drawChart2(rootData){
+				filteredData_map = rootData.filter(function(d) {
+					var date = new Date(d.timestamp);
+    				var mth = date.getMonth() + 1; // 月份
+    				return mth >= monthMin && d.amount <= monthMax && selectedRisks.includes(d.anomaly);;
+				});
+				var totalAmount = d3.sum(filteredData_map, d => d.amount);
+				var totalAmountsByRegion = d3.rollups(filteredData_map, 
+												v => d3.sum(v, d => d.amount), 
+												d => d.location_region);
+				
+				var percentagesByRegion = totalAmountsByRegion.map(([region, amount]) => {
+					return { 
+							region: region, 
+							percentage: (amount / totalAmount * 100).toFixed(2), 
+							amount: amount 
+						};
+				});
+
+				
+				var pie = d3.pie()
+							.sort(null) // 不排序，按照数据顺序绘制
+							.value(d => d.percentage); // 值是计算得到的百分比
+
+				var pieDataByRegion = percentagesByRegion.map(d => {
+					return { 
+							region: d.region, 
+							amount: d.amount, 
+							pieData: pie([d]) 
+						};
+				});
+
+				svg_map = d3.select("#chart2").append("svg")
+							.attr("width", svgWidth) // 确保这里有定义宽度
+							.attr("height", svgHeight); // 确保这里有定义高度
+
+				// 定义一个地图投影
+				var projection = d3.geoMercator().scale(70).translate([svgWidth / 2, svgHeight / 2 + 40]);
+
+				// 创建一个新的地理路径生成器
+				var path = d3.geoPath(projection);
+				
+				const g = svg_map.append('g');
+				// 加载GeoJSON数据并绘制每一个国家/地区
+				d3.json(worldJSON).then(data => {
+					const countries = topojson.feature(data, data.objects.countries);
+					g.selectAll('path').data(countries.features).enter().append('path').
+						attr('class', 'country').attr('d', path);
+					
+					pieDataByRegion.forEach(function(region) {
+						var pieData = region.pieData;
+						var endAngle = pieData[0].data.percentage / 100 * 2 * Math.PI;
+
+						// 获取地区的中心点坐标
+						var centroid = getCentroid(region.region, countries, path);
+						
+						// 添加饼图组
+						var pieGroup = svg_map.append("g")
+												.attr("class", "pie-group")
+												.attr("transform", `translate(${centroid[0]}, ${centroid[1]})`);
+						
+						// 绘制饼图
+						var outerRadius = 23; // 你可以根据你的SVG尺寸调整外半径
+						var innerRadius = 18; // 内半径应该小于外半径，以创建环形效果
+						
+						var arcBackground = d3.arc() // Background ring
+                        	.innerRadius(outerRadius)
+                        	.outerRadius(innerRadius)
+                        	.startAngle(endAngle)
+                        	.endAngle(2 * Math.PI); // Full circle for the background
+
+    					var arcForeground = d3.arc() // Foreground arc for the percentage
+                        	.innerRadius(innerRadius)
+                        	.outerRadius(outerRadius)
+							.startAngle(0)
+							.endAngle(endAngle);
+						
+						var innerGround = d3.arc() // Foreground arc for the percentage
+                        	.innerRadius(0)
+                        	.outerRadius(innerRadius)
+							.startAngle(0)
+							.endAngle(2 * Math.PI);
+						
+						pieGroup.append('path')
+							.attr('d', arcForeground)
+							.attr('fill', '#00008B');
+
+						// Draw background ring
+						pieGroup.append('path')
+							.attr('d', arcBackground)
+							.attr('fill', '#D3D3D3'); // Grey background color
+
+						pieGroup.append('path')
+							.attr('d', innerGround)
+							.attr('fill', 'white'); // Grey background color
+
+
+						pieGroup.append("text")
+								.text(`${region.pieData[0].data.percentage}%`)
+								.attr("dy", "0.4em") // 调整这个值来垂直居中文字
+								.attr("class", "pie-percentage")
+								.style("text-anchor", "middle")
+								.style("font-size", "9px")
+								.style("font-weight", "bold")
+								.style("fill", "black"); // 根据需要调整样式
+						
+						pieGroup.append("text")
+								.text(`$${region.amount.toLocaleString()}`)
+								.attr("dy", "3em") // 这将把金额放在地区名称的下面
+								.attr("class", "pie-amount")
+								.style("text-anchor", "middle")
+								.style("font-size", "8px")
+								.style("font-weight", "bold")
+								.style("fill", "grey"); // 根据需要调整样式
+
+							// 添加文本标签，显示地区名称和金额
+						pieGroup.append("text")
+								.text(region.region)
+								.attr("dy", "4em") // 这将把地区名称放在百分比的下面
+								.attr("class", "pie-region")
+								.style("text-anchor", "middle")
+								.style("font-size", "8px")
+								.style("font-weight", "bold")
+								.style("fill", "grey"); // 根据需要调整样式
+					});
+				});
+
+			}
 
 
 			d3.csv(dataPath) // initialise Chart1
 				.then(function(myData){
 				rootData = myData;
 				drawChart1(rootData);
-					
+				drawChart2(rootData);
 			});
 			
 		</script>
